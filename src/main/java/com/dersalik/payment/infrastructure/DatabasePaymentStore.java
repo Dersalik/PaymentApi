@@ -5,6 +5,7 @@ import com.dersalik.payment.infrastructure.store.entities.PaymentEntity;
 import com.dersalik.payment.infrastructure.store.repositories.PaymentRepository;
 import io.vavr.control.Either;
 import io.vavr.control.Option;
+import io.vavr.control.Try;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -31,16 +32,33 @@ public class DatabasePaymentStore implements com.dersalik.payment.domain.payment
 
     @Override
     public Either<StructuredError, PaymentResult> save(savePaymentParam param) {
-        return null;
+        return Try.of(() -> PaymentEntity.of(param))
+                .map(paymentRepository::save)
+                .toEither(new StructuredError("Error while storing payment", com.dersalik.payment.domain.errors.ErrorType.SERVER_ERROR))
+                .map(PaymentEntity::toStoreResult);
+
     }
 
     @Override
     public Either<StructuredError, PaymentResult> update(updatePaymentParam param) {
-        return null;
+         return Option.ofOptional(paymentRepository.findById(param.getId()))
+                 .toEither(new StructuredError("Couldn't find payment", com.dersalik.payment.domain.errors.ErrorType.NOT_FOUND_ERROR))
+                 .map(paymentEntity -> {
+                     paymentEntity.setAmount(param.getAmount());
+                     paymentEntity.setUserId(param.getUserID());
+                     paymentEntity.setMethod(param.getMethod());
+                     paymentEntity.setId(param.getId());
+                     return paymentEntity;
+                 })
+                 .map(paymentRepository::save)
+                 .map(PaymentEntity::toStoreResult);
     }
 
     @Override
     public Either<StructuredError, Void> delete(deletePaymentParam param) {
-        return null;
+
+        return Try.run(() -> paymentRepository.deleteById(param.getId()))
+                .toEither(new StructuredError("Error while deleting payment", com.dersalik.payment.domain.errors.ErrorType.SERVER_ERROR));
     }
+
 }
